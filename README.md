@@ -1,8 +1,20 @@
 # OpenClaw 跨服务器迁移手册
 
 > **适用场景：** 将 OpenClaw 从一台服务器迁移到另一台新服务器
-> **前提：** 旧服务器已正常运行 OpenClaw，新服务器已准备就绪（建议 OpenCloudOS 9 / Ubuntu 22.04+）
+> **支持平台：** Linux → Linux / Mac → Linux / Mac → Mac / Linux → Mac
+> **前提：** 旧服务器已正常运行 OpenClaw，新服务器已准备就绪（建议 OpenCloudOS 9 / Ubuntu 22.04+ / macOS 12+）
 > **迁移方式：** 旧服务器打包 → 传输 → 新服务器还原
+
+---
+
+## 支持的迁移路径
+
+| 方向 | 支持状态 | 说明 |
+|------|----------|------|
+| Linux → Linux | ✅ 完全支持 | 当前方案，原生适配 |
+| Mac → Linux | ✅ 完全支持 | 脚本自动识别 macOS 并调整解压方式 |
+| Mac → Mac | ✅ 完全支持 | 直接复制配置文件即可 |
+| Linux → Mac | ✅ 完全支持 | 脚本自动识别并调整解压方式 |
 
 ---
 
@@ -27,7 +39,7 @@
 | 1 | 检查/安装 Node.js | 通过 nvm 安装（默认 v24） |
 | 2 | 安装 OpenClaw + 插件 | **带版本判断**，版本一致则跳过 |
 | 3 | 检查迁移包 | 确认打包文件到位 |
-| 4 | 解压配置 | `sudo tar -xzvf -C /` 覆盖还原 |
+| 4 | 解压配置 | **自动识别 OS**，适配 Linux / macOS 不同解压方式 |
 | 5 | 修正权限 | `chown` 将配置归属当前用户 |
 | 6 | 安装 OpenClaw Gateway | `openclaw gateway install` |
 | 7 | 启动 Gateway | `openclaw gateway start` |
@@ -50,7 +62,6 @@ bash migrate-old.sh <新服务器IP或域名>
 
 **2. 确认打包内容**
 
-脚本会自动完成：
 - 打包 `~/.openclaw/` 为 `openclaw-config.tar.gz`
 - 导出 npm 全局包版本到 `npm-packages.json`
 - 复制还原脚本到迁移目录
@@ -58,7 +69,7 @@ bash migrate-old.sh <新服务器IP或域名>
 
 **3. 关闭旧服务**
 
-打包传输全部完成后，脚本最后一步自动执行 `openclaw gateway stop`。
+打包传输全部完成后，脚本**最后一步**自动执行 `openclaw gateway stop`。
 
 ---
 
@@ -71,11 +82,16 @@ cd $HOME/openclaw-migration
 bash migrate-new.sh
 ```
 
+脚本会自动检测目标系统类型（Linux 或 macOS），并应用对应的解压和权限处理方式。
+
 **2. 脚本自动完成**
 
+- 检测操作系统类型（Linux / macOS）
 - 检查/安装 Node.js（通过 nvm）
 - 安装 OpenClaw + 插件（带版本判断）
-- 解压配置到系统根目录 `/`
+- 解压配置（OS 自适应）：
+  - **Linux**：直接 `tar -C /` 解压到根目录
+  - **macOS**：解压到 `$HOME`，自动处理 SIP 隔离目录
 - 修正权限归属
 - 安装并启动 OpenClaw Gateway
 - 完整性验证并输出结果
@@ -102,28 +118,25 @@ bash migrate-new.sh
 ```bash
 # 确认新服务器 IP 可达
 ping -c 1 <新服务器IP>
-
-# 确认 SSH 端口是 22（默认）
-# 如有不同，修改 migrate-old.sh 中的 scp 命令：
-#   scp -P <端口号> -r ${MIGRATION_DIR} ...
 ```
 
-### 新服务器环境
+### macOS 目标机额外要求
 
-- 建议使用 **OpenCloudOS 9** 或 **Ubuntu 22.04+**
-- 需要有 **sudo 权限**（用于解压和 chown）
-- 需要能够访问 **GitHub**（部分插件从 GitHub 安装）
+- 建议使用 **macOS 12+**
+- 需要 **sudo 权限**
+- 如通过 SSH 远程操作，需先在「系统设置 → 通用 → 登录项 → 远程登录」开启 SSH 服务
+- macOS SIP（系统完整性保护）会隔离解压路径，脚本会自动处理
 
 ### 插件版本
 
-在 `migrate-new.sh` 中修改 `npm_ensure` 调用（第 52-54 行）：
+在 `migrate-new.sh` 第 52-54 行修改：
 
 ```bash
 npm_ensure "openclaw" "版本号"
 npm_ensure "@组织/插件名" "版本号"
 ```
 
-版本号留空则跳过版本检查，直接安装最新版。
+留空则安装最新版。
 
 ---
 
@@ -131,10 +144,9 @@ npm_ensure "@组织/插件名" "版本号"
 
 | 问题 | 解决方案 |
 |------|----------|
-| scp 传输失败 connection refused | 检查新服务器 IP、SSH 端口、防火墙 |
-| git clone 失败 Permission denied | 确认 GitHub SSH 公钥已添加到账户 |
-| 解压后权限报错 | 手动运行 `sudo chown -R $(whoami) ~/.openclaw/` |
-| Gateway 启动后 probe 失败 | 检查端口 18789：`ss -tlnp \| grep 18789` |
+| scp 传输失败 | 检查新服务器 IP、SSH 端口（macOS 需开启远程登录）、防火墙 |
+| 解压后权限报错 | Linux：`sudo chown -R $(whoami) ~/.openclaw/`；macOS：脚本自动处理 |
+| Gateway probe 失败 | 检查端口 18789：`ss -tlnp \| grep 18789`（Linux）或 `lsof -i :18789`（macOS） |
 | npm 安装很慢 | `npm config set registry https://registry.npmmirror.com` |
 
 ---
@@ -144,6 +156,6 @@ npm_ensure "@组织/插件名" "版本号"
 ```
 move_ur_openclaw/
 ├── migrate-old.sh     # 旧服务器打包脚本
-├── migrate-new.sh     # 新服务器还原脚本
+├── migrate-new.sh     # 新服务器还原脚本（Linux / macOS 自适应）
 └── README.md          # 本手册
 ```
