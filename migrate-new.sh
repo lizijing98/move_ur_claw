@@ -17,15 +17,27 @@ echo "=========================================="
 MIGRATION_DIR="$HOME/openclaw-migration"
 
 # --- OS 检测 ---
-OS_TYPE="$(uname)"
-if [ "$OS_TYPE" = "Darwin" ]; then
-  echo "检测到 macOS，将使用适合 macOS 的解压方式"
-elif [ "$OS_TYPE" = "Linux" ]; then
-  echo "检测到 Linux，将使用适合 Linux 的解压方式"
+# 优先读取旧服务器指定的 target OS，否则自动检测
+if [ -f "${MIGRATION_DIR}/target-os.txt" ]; then
+  TARGET_OS="$(cat ${MIGRATION_DIR}/target-os.txt | tr -d '[:space:]')"
+  echo "检测到目标平台标记: $TARGET_OS（来自迁移包）"
 else
-  echo "检测到未知系统: $OS_TYPE"
-  echo "继续执行，如有问题请手动调整"
+  TARGET_OS="$(uname | tr '[:upper:]' '[:lower:]')"
+  echo "未检测到目标平台标记，自动识别: $TARGET_OS"
 fi
+
+case "$TARGET_OS" in
+  linux)
+    echo "使用 Linux 解压模式"
+    ;;
+  darwin|macos)
+    echo "使用 macOS 解压模式"
+    ;;
+  *)
+    echo "未知目标平台: $TARGET_OS，将尝试自动检测"
+    TARGET_OS="$(uname | tr '[:upper:]' '[:lower:]')"
+    ;;
+esac
 
 # --- npm 版本检查函数 ---
 npm_ensure() {
@@ -90,15 +102,10 @@ ls -lh ${MIGRATION_DIR}/
 echo ""
 echo "[4/8] 解压配置..."
 
-# 检测是否有 GNU tar（Linux 常用）或 BSD tar（macOS 自带）
-TAR_HAS_WARNING=0
-tar --version &>/dev/null && TAR_HAS_WARNING=1
-
-if [ "$OS_TYPE" = "Darwin" ]; then
+if [ "$TARGET_OS" = "darwin" ] || [ "$TARGET_OS" = "macos" ]; then
   # macOS: 解压到 HOME，然后移动 .openclaw 到正确位置
   echo "  [macOS 模式] 解压到 HOME 目录..."
-  tar -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C $HOME/ 2>/dev/null || \
-    tar -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C $HOME/
+  tar -xzf ${MIGRATION_DIR}/openclaw-config.tar.gz -C $HOME/
 
   # macOS SIP 可能将 root 目录的文件放在 $HOME/root/ 下
   if [ -d "$HOME/root" ] && [ -d "$HOME/root/.openclaw" ]; then
@@ -106,26 +113,17 @@ if [ "$OS_TYPE" = "Darwin" ]; then
     sudo mv $HOME/root/.openclaw $HOME/
     sudo rm -rf $HOME/root
   fi
-elif [ "$OS_TYPE" = "Linux" ]; then
+else
   # Linux: 直接解压到根目录
   echo "  [Linux 模式] 解压到系统根目录..."
-  if [ $TAR_HAS_WARNING -eq 1 ]; then
-    sudo tar --warning=no-file-changed -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C / 2>/dev/null || \
-      sudo tar -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C /
-  else
-    sudo tar -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C / 2>/dev/null || \
-      sudo tar -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C /
-  fi
-else
-  echo "  [兼容模式] 解压到 HOME 目录..."
-  tar -xzvf ${MIGRATION_DIR}/openclaw-config.tar.gz -C $HOME/
+  sudo tar -xzf ${MIGRATION_DIR}/openclaw-config.tar.gz -C /
 fi
+echo "  解压完成"
 
 # --- 步骤5：修正权限 ---
 echo ""
 echo "[5/8] 修正权限..."
-if [ "$OS_TYPE" = "Darwin" ]; then
-  # macOS 上 Homebrew 等通常不依赖系统 /usr/local 的权限
+if [ "$TARGET_OS" = "darwin" ] || [ "$TARGET_OS" = "macos" ]; then
   sudo chown -R $(whoami):$(id -gn) $HOME/.openclaw/ 2>/dev/null || \
     chown -R $(whoami):$(id -gn) $HOME/.openclaw/
 else
