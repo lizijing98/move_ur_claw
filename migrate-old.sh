@@ -4,7 +4,7 @@
 # 使用方法: bash migrate-old.sh [选项]
 #
 # 选项：
-#   --target  <linux|darwin>   目标服务器操作系统类型（默认: linux）
+#   --target  <linux|darwin|mac>   目标服务器操作系统类型（默认: linux）
 #   --scp     <yes|no>         是否通过 scp 传输到新服务器（默认: yes）
 #
 # 示例：
@@ -30,7 +30,7 @@ while [[ $# -gt 0 ]]; do
       ;;
     *)
       echo "未知参数: $1"
-      echo "用法: bash migrate-old.sh [--target linux|darwin] [--scp yes|no]"
+      echo "用法: bash migrate-old.sh [--target linux|darwin|mac] [--scp yes|no]"
       exit 1
       ;;
   esac

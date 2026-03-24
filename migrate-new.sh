@@ -27,10 +27,14 @@ else
 fi
 
 case "$TARGET_OS" in
+  mac|macos)
+    TARGET_OS="darwin"
+    echo "使用 macOS 解压模式"
+    ;;
   linux)
     echo "使用 Linux 解压模式"
     ;;
-  darwin|macos)
+  darwin)
     echo "使用 macOS 解压模式"
     ;;
   *)
