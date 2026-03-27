@@ -8,7 +8,6 @@
 
 - ✅ **版本清单同步** — 自动导出 npm 包、clawhub skills、插件版本的完整清单
 - ✅ **零差异迁移** — 新服务器安装与旧服务器完全一致的版本
-- ✅ **纯 Shell + Node.js** — 不依赖 Python，仅需 Node.js 环境
 - ✅ **多平台支持** — Linux ↔ Linux、macOS ↔ Linux、macOS ↔ macOS
 
 ---
@@ -173,7 +172,7 @@ ping -c 1 <新主机IP>
 ## 技术实现
 
 - **Shell** — 流程控制、参数解析、文件操作
-- **Node.js** — JSON 解析、版本比对、清单生成（无需 Python）
+- **Node.js** — JSON 解析、版本比对、清单生成
 - **tar** — 配置文件打包/解压
 - **npm** — OpenClaw 及插件安装
 - **clawhub** — skills 同步（可选）
